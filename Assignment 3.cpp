@@ -5,6 +5,13 @@
 
 #include <TL-Engine.h>;	// TL-Engine include file and namespace
 using namespace tle;
+
+float angle = 0.0f;
+float radian = 0.0f;
+float pi = 3.14159265359f;
+
+float xDir = 0.0f;
+
 bool floatingUp = true;
 float Zero = 0.0f;
 I3DEngine* myEngine = New3DEngine(kTLX);
@@ -33,6 +40,10 @@ float wallZSpawn = 46.0f;
 float wallXSpawn[2] = { -10.5f, 9.5f };
 float isleXSpawn[4] = { 10.0f, -10.0f, 10.0f, -10.0f };
 float isleZSpawn[4] = { 40.0f, 40.0f, 53.0f, 53.0f  };
+
+//prototyping
+void angleToRadian(float angle);
+void radianToVector(float radian);
 
 void main()
 {
@@ -139,4 +150,13 @@ void main()
 
 	// Delete the 3D engine now we are finished with it
 	myEngine->Delete();
+}
+
+void angleToRadian(float angle)
+{
+	radian = (angle * pi) / 180;
+}
+void radianToVector(float radian)
+{
+	xDir = cos(radian);
 }
