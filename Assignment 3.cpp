@@ -3,8 +3,10 @@
 // by Nathan Hendley			 //
 ///////////////////////////////////
 
-#include <TL-Engine.h>	// TL-Engine include file and namespace
+#include <TL-Engine.h>;	// TL-Engine include file and namespace
 using namespace tle;
+bool floatingUp = true;
+float Zero = 0.0f;
 I3DEngine* myEngine = New3DEngine(kTLX);
 
 EKeyCode forwards = Key_W;
@@ -14,14 +16,14 @@ EKeyCode leftTurn = Key_A;
 
 float moveSpeed = 0.0000005f;
 float currentSpeed = 0.0f;
-float maxSpeed = 0.005f;
-float maxBackSpeed = -0.0004f;
+float maxSpeed = 0.01f;
+float maxBackSpeed = -0.001f;
 float rotateSpeed = 0.004f;
 float bankSpeed = 0.003f;
 
-float currentBank = 0.0f;
-float bankLimit = 0.005f;
-float bankCenter = 0.0f;
+float floatspeed = 0.0002f;
+float currentfloat = 0.0f;
+float floatLimit = 0.4f;
 
 float carRadius = 6.0f;
 
@@ -53,7 +55,7 @@ void main()
 	IModel* floor = floorMesh->CreateModel(0, 0, 0);
 
 	IMesh* carMesh = myEngine->LoadMesh("race2.x");
-	IModel* car = carMesh->CreateModel(0.0f, 0.0f, -50.0f);
+	IModel* car = carMesh->CreateModel(0.0f, 0.01f, -50.0f);
 
 	IMesh* checkpointMesh = myEngine->LoadMesh("Checkpoint.x");
 	IModel* checkpoint[2];
@@ -85,6 +87,23 @@ void main()
 		myEngine->DrawScene();
 
 		/**** Update your scene each frame here ****/
+		if (floatingUp == true)
+		{
+			car->MoveY(floatspeed);
+			if (car->GetY() > floatLimit)
+			{
+				floatingUp = false;
+			}
+		}
+		if (floatingUp == false)
+		{
+			car->MoveY(-floatspeed);
+			if (car->GetY() < -floatLimit)
+			{
+				floatingUp = true;
+			}
+		}
+
 		if (myEngine->KeyHeld(forwards))
 		{
 			if (currentSpeed < maxSpeed)
