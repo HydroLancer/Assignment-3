@@ -11,6 +11,7 @@ float radian = 0.0f;
 float pi = 3.14159265359f;
 
 float xDir = 0.0f;
+float zDir = 0.0f;
 
 bool floatingUp = true;
 float Zero = 0.0f;
@@ -43,7 +44,7 @@ float isleZSpawn[4] = { 40.0f, 40.0f, 53.0f, 53.0f  };
 
 //prototyping
 void angleToRadian(float angle);
-void radianToVector(float radian);
+void radianToVector(float radian, float currentSpeed);
 
 void main()
 {
@@ -98,6 +99,10 @@ void main()
 		myEngine->DrawScene();
 
 		/**** Update your scene each frame here ****/
+		angleToRadian(angle);
+		radianToVector(radian, currentSpeed);
+		car->Move(xDir * moveSpeed, 0, zDir * moveSpeed);
+
 		if (floatingUp == true)
 		{
 			car->MoveY(floatspeed);
@@ -139,13 +144,12 @@ void main()
 		}
 		if (myEngine->KeyHeld(leftTurn))
 		{
-			car->RotateLocalY(-rotateSpeed);
+			angle = angle + rotateSpeed;
 		}
 		if (myEngine->KeyHeld(rightTurn))
 		{
-			car->RotateLocalY(rotateSpeed);
+			angle = angle - rotateSpeed;
 		}
-		car->MoveLocalZ(currentSpeed);
 	}
 
 	// Delete the 3D engine now we are finished with it
@@ -156,7 +160,8 @@ void angleToRadian(float angle)
 {
 	radian = (angle * pi) / 180;
 }
-void radianToVector(float radian)
+void radianToVector(float radian, float currentSpeed)
 {
-	xDir = cos(radian);
+	xDir = sin(radian);
+	zDir = cos(radian);
 }
