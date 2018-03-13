@@ -7,19 +7,27 @@
 using namespace tle;
 bool floatingUp = true;
 float Zero = 0.0f;
+
+enum currentState {Countdown, Go, FirstCheckpoint, Finish};
+
 I3DEngine* myEngine = New3DEngine(kTLX);
+
+float carFacing;
+float timer;
 
 EKeyCode forwards = Key_W;
 EKeyCode backwards = Key_S;
 EKeyCode rightTurn = Key_D;
 EKeyCode leftTurn = Key_A;
 
-float moveSpeed = 0.0000005f;
 float currentSpeed = 0.0f;
 float maxSpeed = 0.01f;
-float maxBackSpeed = -0.001f;
-float rotateSpeed = 0.004f;
+float maxBackSpeed = -0.01f;
+float rotateSpeed = 50.0f;
 float bankSpeed = 0.003f;
+
+float drag = 0.01f;
+float thrustFactor = 0.05f;
 
 float floatspeed = 0.0002f;
 float currentfloat = 0.0f;
@@ -33,6 +41,75 @@ float wallZSpawn = 46.0f;
 float wallXSpawn[2] = { -10.5f, 9.5f };
 float isleXSpawn[4] = { 10.0f, -10.0f, 10.0f, -10.0f };
 float isleZSpawn[4] = { 40.0f, 40.0f, 53.0f, 53.0f  };
+
+//Deals with car movement (forwards, backwards, and rotation. Not vector moved yet)
+void carMovement(IModel* model)
+{
+	if (myEngine->KeyHeld(forwards))
+	{
+		if (currentSpeed < maxSpeed)
+		{
+			currentSpeed = currentSpeed + thrustFactor * timer;
+		}
+		else
+		{
+			currentSpeed;
+		}
+	}
+	if (myEngine->KeyHeld(backwards))
+	{
+		if (currentSpeed > maxBackSpeed)
+		{
+			currentSpeed = currentSpeed - thrustFactor * timer;
+		}
+		else
+		{
+			currentSpeed;
+		}
+	}
+	if (myEngine->KeyHeld(leftTurn))
+	{
+		model->RotateLocalY(-rotateSpeed * timer);
+	}
+	if (myEngine->KeyHeld(rightTurn))
+	{
+		model->RotateLocalY(rotateSpeed * timer);
+	}
+
+	if (currentSpeed > 0)
+	{
+		model->MoveLocalZ(currentSpeed);
+		currentSpeed = currentSpeed - (drag * timer);
+	}
+	else if (currentSpeed < 0)
+	{
+		
+		model->MoveLocalZ(currentSpeed);
+		currentSpeed = currentSpeed + (drag * timer);
+	}
+}
+
+//Floaty!
+void carFloaty(IModel* model)
+{
+	if (floatingUp == true)
+	{
+		model->MoveY(floatspeed);
+		if (model->GetY() > floatLimit)
+		{
+			floatingUp = false;
+		}
+	}
+	if (floatingUp == false)
+	{
+		model->MoveY(-floatspeed);
+		if (model->GetY() < -floatLimit)
+		{
+			floatingUp = true;
+		}
+	}
+}
+
 
 void main()
 {
@@ -66,6 +143,8 @@ void main()
 	IMesh* wallMesh = myEngine->LoadMesh("Wall.x");
 	IModel* wall[2];
 
+	IFont* myFont = myEngine->LoadFont("Charlemagne std", 30);
+
 	//Loading checkpoints & walls
 	for (int i = 0; i < 2; i++)
 	{
@@ -79,7 +158,7 @@ void main()
 	}
 	
 	camera->AttachToParent(car);
-
+	timer = myEngine->Timer();
 	// The main game loop, repeat until engine is stopped
 	while (myEngine->IsRunning())
 	{
@@ -87,54 +166,12 @@ void main()
 		myEngine->DrawScene();
 
 		/**** Update your scene each frame here ****/
-		if (floatingUp == true)
-		{
-			car->MoveY(floatspeed);
-			if (car->GetY() > floatLimit)
-			{
-				floatingUp = false;
-			}
-		}
-		if (floatingUp == false)
-		{
-			car->MoveY(-floatspeed);
-			if (car->GetY() < -floatLimit)
-			{
-				floatingUp = true;
-			}
-		}
+		timer = myEngine->Timer();
 
-		if (myEngine->KeyHeld(forwards))
-		{
-			if (currentSpeed < maxSpeed)
-			{
-				currentSpeed = currentSpeed + moveSpeed;
-			}
-			else
-			{
-				currentSpeed;
-			}
-		}
-		if (myEngine->KeyHeld(backwards))
-		{
-			if (currentSpeed > maxBackSpeed)
-			{
-				currentSpeed = currentSpeed - moveSpeed;
-			}
-			else
-			{
-				currentSpeed;
-			}
-		}
-		if (myEngine->KeyHeld(leftTurn))
-		{
-			car->RotateLocalY(-rotateSpeed);
-		}
-		if (myEngine->KeyHeld(rightTurn))
-		{
-			car->RotateLocalY(rotateSpeed);
-		}
-		car->MoveLocalZ(currentSpeed);
+		carFloaty(car);
+		carMovement(car);
+		
+		
 	}
 
 	// Delete the 3D engine now we are finished with it
