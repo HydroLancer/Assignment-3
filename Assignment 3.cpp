@@ -52,7 +52,7 @@ EKeyCode leftTurn = Key_A;
 
 float rotateSpeed = 50.0f;
 
-float dragFactor = -0.04f;
+float dragFactor = -0.5f;
 float thrustFactor = 0.02f;
 
 float floatspeed = 0.0002f;
