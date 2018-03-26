@@ -24,22 +24,24 @@ struct vectors
 	float z;
 };
 
+//scalar is thrustfactor..
 vectors scalar(float scalar, vectors v)
 {
 	return{ scalar * v.x, scalar * v.z };
 }
 
+//v1 = current momentum, v2 = thrust, v3 = drag
 vectors sum(vectors v1, vectors v2, vectors v3)
 {
 	return{ v1.x + v2.x + v3.x, v1.z + v2.z + v3.z };
 }
 
-vectors momentum{ 0.0f, 0.0f };
-vectors thrust{ 0.0f, 0.0f };
+//Used to work out movement
+vectors momentum{ 0.0f, 0.0f };		//Actual movement of the car {X, Z}
+vectors thrust{ 0.0f, 0.0f };		//thrust/drag used in calculations for momentum
 vectors drag{ 0.0f, 0.0f };
 
-enum currentState {Countdown, Go, FirstCheckpoint, Finish};
-
+enum currentState {Waiting, Countdown, Go, FirstCheckpoint, Finish};
 
 I3DEngine* myEngine = New3DEngine(kTLX);
 
@@ -49,8 +51,23 @@ EKeyCode forwards = Key_W;
 EKeyCode backwards = Key_S;
 EKeyCode rightTurn = Key_D;
 EKeyCode leftTurn = Key_A;
+EKeyCode quit = Key_Escape;
+
+EKeyCode cameraForward = Key_Up;
+EKeyCode cameraBackward = Key_Down;
+EKeyCode cameraRight = Key_Right;
+EKeyCode cameraLeft = Key_Left;
+EKeyCode SpaceBar = Key_Space;
+
+float mouseMoveX;
+float mouseMoveY;
+
+float carOldX;
+float carOldZ;
 
 float rotateSpeed = 50.0f;
+
+float cameraSpeed = 3.0f;
 
 float dragFactor = -0.5f;
 float thrustFactor = 0.02f;
@@ -62,30 +79,33 @@ float floatLimit = 0.4f;
 float carRadius = 6.0f;
 
 float checkpointZSpawn[2] = { 0.0f, 100.0f };
+float checkpointXSpawn[2] = { 0.0f, 0.0f };
+float checkpointRadius = 0.64f;
 
 float wallZSpawn = 46.0f;
 float wallXSpawn[2] = { -10.5f, 9.5f };
 float isleXSpawn[4] = { 10.0f, -10.0f, 10.0f, -10.0f };
 float isleZSpawn[4] = { 40.0f, 40.0f, 53.0f, 53.0f  };
 
-float checkpointNubX = 9.86f;
+float distanceToLeg = 4.9f;
 
-float counter = 4.0f;
+float counter = 4.0f;		//used to countdown
 
 float carMatrix[4][4];
-//Deals with car movement
-void carMovement(IModel* model)
+
+//Deals with car movement (Using functions above. Scalar multiplaction to calculate thrust using drag, and momentum.
+void carMovement(IModel* model, IModel* car)
 {
-	model->GetMatrix(&carMatrix[0][0]);
+	car->GetMatrix(&carMatrix[0][0]);
 	vectors facingVector = { carMatrix[2][0], carMatrix[2][2] };
-	
+
 	if (myEngine->KeyHeld(leftTurn))
 	{
-		model->RotateLocalY(-rotateSpeed*timer);
+		car->RotateLocalY(-rotateSpeed * timer);
 	}
 	if (myEngine->KeyHeld(rightTurn))
 	{
-		model->RotateLocalY(rotateSpeed*timer);
+		car->RotateLocalY(rotateSpeed*timer);
 	}
 
 	if (myEngine->KeyHeld(forwards))
@@ -117,7 +137,7 @@ void carMovement(IModel* model)
 	momentum = sum(momentum, thrust, drag);
 
 	model->Move(momentum.x, 0.0f, momentum.z);
-	
+
 }
 
 //Floaty!
@@ -141,6 +161,31 @@ void carFloaty(IModel* model)
 	}
 }
 
+void cameraControl(float mouseX, float mouseY, I3DEngine* myEngine, ICamera* camera)
+{
+	mouseMoveX = myEngine->GetMouseMovementY();
+	mouseMoveY = myEngine->GetMouseMovementX();
+
+	camera->RotateLocalX(mouseMoveX);
+	camera->RotateY(mouseMoveY);
+
+	if (myEngine->KeyHeld(cameraForward))
+	{
+		camera->MoveZ(cameraSpeed * timer);
+	}
+	if (myEngine->KeyHeld(cameraBackward))
+	{
+		camera->MoveZ(-cameraSpeed * timer);
+	}
+	if (myEngine->KeyHeld(cameraLeft))
+	{
+		camera->MoveX(-cameraSpeed * timer);
+	}
+	if (myEngine->KeyHeld(cameraRight))
+	{
+		camera->MoveX(cameraSpeed * timer);
+	}
+}
 
 void main()
 {
@@ -166,13 +211,13 @@ void main()
 
 	IMesh* dummyMesh = myEngine->LoadMesh("dummy.x");
 	IModel* cardummy = dummyMesh->CreateModel(0,0,0);
-	vector <IModel*> checkpointdummy;
 
 	IMesh* carMesh = myEngine->LoadMesh("race2.x");
 	IModel* car = carMesh->CreateModel(0.0f, 0.01f, -50.0f);
 
 	IMesh* checkpointMesh = myEngine->LoadMesh("Checkpoint.x");
-	IModel* checkpoint[2];
+	IModel* checkpointOne = checkpointMesh->CreateModel(checkpointXSpawn[0], 0, checkpointZSpawn[0]);
+	IModel* checkpointTwo = checkpointMesh->CreateModel(checkpointXSpawn[1], 0, checkpointZSpawn[1]);
 
 	IMesh* isleMesh = myEngine->LoadMesh("IsleStraight.x");
 	IModel* isle[4];
@@ -182,14 +227,9 @@ void main()
 
 	IFont* myFont = myEngine->LoadFont("Charlemagne std", 30);
 
-	//Loading checkpoints & walls
+	//Loading walls
 	for (int i = 0; i < 2; i++)
 	{
-		checkpoint[i] = checkpointMesh->CreateModel(0, 0, checkpointZSpawn[i]);
-		for (int j = 0; j < 2; j++)
-		{
-			//spawn dummies for collision??
-		}
 		wall[i] = wallMesh->CreateModel(wallXSpawn[i], 0, wallZSpawn);
 	}
 	//isles
@@ -197,11 +237,12 @@ void main()
 	{
 		isle[j] = isleMesh->CreateModel(isleXSpawn[j], 0, isleZSpawn[j]);
 	}
-	currentState gameState = Countdown;
+	currentState gameState = Waiting;
 
 	car->AttachToParent(cardummy);
 	camera->AttachToParent(car);
 	timer = myEngine->Timer();
+
 	// The main game loop, repeat until engine is stopped
 	while (myEngine->IsRunning())
 	{
@@ -211,36 +252,60 @@ void main()
 		/**** Update your scene each frame here ****/
 		timer = myEngine->Timer();
 		
-		//CAN'T MAKE IT WORK????
-		/*if (gameState == Countdown)
+		if (gameState == Waiting)
 		{
-			if (counter <= 4.0f && counter > 3.0f)
+			myFont->Draw("Press Space to Start!", 150, 50, kRed);
+			if (myEngine->KeyHit(SpaceBar))
+			{
+				gameState = Countdown;
+			}
+		}
+		if (gameState == Countdown)
+		{
+			if (counter <= 4.0f && counter > 3.1f)
 			{
 				myFont->Draw("3..", 150, 50, kRed);
-				counter = counter - myEngine->Timer();
 			}
-			if (counter < 2.9f && counter > 2.0f)
+			if (counter < 3.0f && counter > 2.0f)
 			{
 				myFont->Draw("2..", 150, 50, kRed );
-				counter = counter - myEngine->Timer();
 			}
-
-			if (counter < 1.9f && counter > 1.0f)
+			if (counter < 2.0f && counter > 1.0f)
 			{
 				myFont->Draw("1..", 150, 50, kRed);
-				counter = counter - myEngine->Timer();
 			}
-			if (counter < 0.9f && counter > 0.0f)
+			if (counter < 1.0f && counter > 0.0f)
 			{
 				myFont->Draw("Go!", 150, 50, kGreen);
-				counter = counter - myEngine->Timer();
 			}
-		}*/
-		/*if (gameState == Go)
-		{*/
+			if (counter < 0.0f)
+			{
+				myFont->Draw("Go!", 150, 50, kGreen);
+				gameState = Go;
+			}
+
+			counter = counter - timer;
+		}
+		if (gameState == Go)
+		{
 			carFloaty(car);
-			carMovement(car);
-		//}
+			carMovement(cardummy, car);
+			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera);
+		}
+		if (myEngine->KeyHit(quit))
+		{
+			myEngine->Stop();
+		}
+
+
+		for (int i = 0; i < 2; i++)
+		{
+			//fffrrrrtttttt
+			if (cardummy->GetX() < checkpointXSpawn[i] - distanceToLeg + checkpointRadius && cardummy->GetZ() >= checkpointZSpawn[i] + checkpointRadius)
+			{
+				cardummy->MoveLocal(0, 0, -0.009); //collision detection makes for sad Hydro ;_;
+			}
+		}
 		
 	}
 
