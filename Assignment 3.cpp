@@ -65,6 +65,8 @@ float mouseMoveY;
 float carOldX;
 float carOldZ;
 
+float maxRotation = 0.1;
+
 float rotateSpeed = 50.0f;
 
 float cameraSpeed = 3.0f;
@@ -77,6 +79,8 @@ float currentfloat = 0.0f;
 float floatLimit = 0.4f;
 
 float carRadius = 6.0f;
+float wallWidth = 1.0f;
+float wallLength = 4.0f;
 
 float checkpointZSpawn[2] = { 0.0f, 100.0f };
 float checkpointXSpawn[2] = { 0.0f, 0.0f };
@@ -187,21 +191,38 @@ void cameraControl(float mouseX, float mouseY, I3DEngine* myEngine, ICamera* cam
 	}
 }
 
-void collisionDetection(IModel* car, IModel* dummy[])
+void collisionDetection(IModel* car, IModel* dummy[], IModel* wall[])
 {
+	//checkpoint detection (legs)
 	for (int i = 0; i < 4; i++)
 	{
-		//checkpoints! (WORKING!!!! :DDDDD)
 		float x = car->GetX() - dummy[i]->GetX();
 		float z = car->GetZ() - dummy[i]->GetZ();
 
 		float distance = sqrt(x * x + z * z);
 		
-		if (distance < carRadius + checkpointRadius) //WE DID IT LADS
+		if (distance < carRadius + checkpointRadius) 
 		{
-			car->MoveLocalZ(-0.9f * timer);
+			car->MoveLocalZ(-1.0f * timer);
 			momentum = { 0.0f, 0.0f };
 			thrust = { 0.0f, 0.0f };
+		}
+	}
+	//walls detections (vertical) (??????? collision detection is waaaaaaaaaay off)
+	for (int i = 0; i < 2; i++)
+	{
+		float wallMinX,	wallMaxX, wallMinZ, wallMaxZ;
+		wallMinX = (wall[i]->GetX() - wallWidth) + carRadius;
+		wallMaxX = (wall[i]->GetX() + wallWidth) + carRadius;
+		wallMinZ = (wall[i]->GetZ() - wallLength) + carRadius;
+		wallMaxZ = (wall[i]->GetZ() + wallLength) + carRadius;
+
+		if (car->GetX() > wallMinX && car->GetX() < wallMaxX
+			&& car->GetZ() > wallMinZ && car->GetZ() > wallMaxZ)
+		{
+			momentum = { 0.0f, 0.0f };
+			thrust = { 0.0f, 0.0f };
+			car->MoveLocalZ(-1.0f * timer);
 		}
 	}
 }
@@ -326,7 +347,7 @@ void main()
 			carFloaty(car);
 			carMovement(car);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera);
-			collisionDetection(car, checkpointdummy);
+			collisionDetection(car, checkpointdummy, wall);
 		}
 		if (myEngine->KeyHit(quit))
 		{
