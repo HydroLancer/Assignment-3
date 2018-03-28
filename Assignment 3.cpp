@@ -15,7 +15,7 @@ struct checkpoints
 {
 	float x;
 	float z;
-	float leg = 9.86f;
+	
 };
 
 struct vectors
@@ -87,14 +87,14 @@ float wallXSpawn[2] = { -10.5f, 9.5f };
 float isleXSpawn[4] = { 10.0f, -10.0f, 10.0f, -10.0f };
 float isleZSpawn[4] = { 40.0f, 40.0f, 53.0f, 53.0f  };
 
-float distanceToLeg = 4.9f;
+float legPos = 9.86f;
 
 float counter = 4.0f;		//used to countdown
 
 float carMatrix[4][4];
 
 //Deals with car movement (Using functions above. Scalar multiplaction to calculate thrust using drag, and momentum.
-void carMovement(IModel* model, IModel* car)
+void carMovement(IModel* car)
 {
 	car->GetMatrix(&carMatrix[0][0]);
 	vectors facingVector = { carMatrix[2][0], carMatrix[2][2] };
@@ -136,7 +136,7 @@ void carMovement(IModel* model, IModel* car)
 	drag = scalar(dragFactor * timer, momentum);
 	momentum = sum(momentum, thrust, drag);
 
-	model->Move(momentum.x, 0.0f, momentum.z);
+	car->Move(momentum.x, 0.0f, momentum.z);
 
 }
 
@@ -187,6 +187,25 @@ void cameraControl(float mouseX, float mouseY, I3DEngine* myEngine, ICamera* cam
 	}
 }
 
+void collisionDetection(IModel* car, IModel* dummy[])
+{
+	for (int i = 0; i < 4; i++)
+	{
+		//checkpoints! (WORKING!!!! :DDDDD)
+		float x = car->GetX() - dummy[i]->GetX();
+		float z = car->GetZ() - dummy[i]->GetZ();
+
+		float distance = sqrt(x * x + z * z);
+		
+		if (distance < carRadius + checkpointRadius) //WE DID IT LADS
+		{
+			car->MoveLocalZ(-0.9f * timer);
+			momentum = { 0.0f, 0.0f };
+			thrust = { 0.0f, 0.0f };
+		}
+	}
+}
+
 void main()
 {
 	// Create a 3D engine (using TLX engine here) and open a window for it
@@ -210,14 +229,31 @@ void main()
 	IModel* floor = floorMesh->CreateModel(0, 0, 0);
 
 	IMesh* dummyMesh = myEngine->LoadMesh("dummy.x");
-	IModel* cardummy = dummyMesh->CreateModel(0,0,0);
 
 	IMesh* carMesh = myEngine->LoadMesh("race2.x");
 	IModel* car = carMesh->CreateModel(0.0f, 0.01f, -50.0f);
 
 	IMesh* checkpointMesh = myEngine->LoadMesh("Checkpoint.x");
-	IModel* checkpointOne = checkpointMesh->CreateModel(checkpointXSpawn[0], 0, checkpointZSpawn[0]);
-	IModel* checkpointTwo = checkpointMesh->CreateModel(checkpointXSpawn[1], 0, checkpointZSpawn[1]);
+	IModel* checkpoint[2];
+	IModel* checkpointdummy[4];
+
+	for (int i = 0; i < 2; i++)
+	{
+		checkpoint[i] = checkpointMesh->CreateModel(checkpointXSpawn[i], 0, checkpointZSpawn[i]);
+	}
+	
+	checkpointdummy[0] = dummyMesh->CreateModel(legPos, 0, 0);
+	checkpointdummy[0]->AttachToParent(checkpoint[0]);
+
+	checkpointdummy[1] = dummyMesh->CreateModel(-legPos, 0, 0);
+	checkpointdummy[1]->AttachToParent(checkpoint[0]);
+
+	checkpointdummy[2] = dummyMesh->CreateModel(legPos, 0, 0);
+	checkpointdummy[2]->AttachToParent(checkpoint[1]);
+
+	checkpointdummy[3] = dummyMesh->CreateModel(-legPos, 0, 0);
+	checkpointdummy[3]->AttachToParent(checkpoint[1]);
+	
 
 	IMesh* isleMesh = myEngine->LoadMesh("IsleStraight.x");
 	IModel* isle[4];
@@ -239,7 +275,6 @@ void main()
 	}
 	currentState gameState = Waiting;
 
-	car->AttachToParent(cardummy);
 	camera->AttachToParent(car);
 	timer = myEngine->Timer();
 
@@ -289,22 +324,13 @@ void main()
 		if (gameState == Go)
 		{
 			carFloaty(car);
-			carMovement(cardummy, car);
+			carMovement(car);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera);
+			collisionDetection(car, checkpointdummy);
 		}
 		if (myEngine->KeyHit(quit))
 		{
 			myEngine->Stop();
-		}
-
-
-		for (int i = 0; i < 2; i++)
-		{
-			//fffrrrrtttttt
-			if (cardummy->GetX() < checkpointXSpawn[i] - distanceToLeg + checkpointRadius && cardummy->GetZ() >= checkpointZSpawn[i] + checkpointRadius)
-			{
-				cardummy->MoveLocal(0, 0, -0.009); //collision detection makes for sad Hydro ;_;
-			}
 		}
 		
 	}
