@@ -6,6 +6,7 @@
 #include <TL-Engine.h>	// TL-Engine include file and namespace
 #include <sstream>
 #include <vector>
+
 using namespace std;
 using namespace tle;
 bool floatingUp = true;
@@ -82,7 +83,7 @@ float floatLimit = 0.4f;
 float carRadius = 6.0f;
 float wallWidth = 2.0f;
 float wallLength = 10.0f;
-float checkpointInX = 8.0f;
+float checkpointInX = 9.5f;
 float checkpointinZ = 2.0f;
 
 float checkpointZSpawn[2] = { 0.0f, 100.0f };
@@ -101,6 +102,8 @@ float legPos = 9.86f;
 float counter = 4.0f;		//used to countdown
 
 float carMatrix[4][4];
+
+
 
 //Deals with car movement (Using functions above. Scalar multiplaction to calculate thrust using drag, and momentum.
 void carMovement(IModel* car)
@@ -242,6 +245,34 @@ void getCheckpoint(IModel* checkpoint)
 	checkpointMaxZ = checkpoint->GetZ() + checkpointinZ;
 }
 
+void speedOutput(IFont* font)
+{
+	stringstream speedText;
+	if (momentum.z < 0.0f && momentum.x < 0.0f)
+	{
+		speedText << "Current Speed: " << int((-momentum.z + -momentum.x) * 1000);
+	}
+	else if (momentum.z > 0.0f && momentum.x > 0.0f)
+	{
+		speedText << "Current Speed: " << int((momentum.z + momentum.x)* 1000);
+	}
+	else if (momentum.z < 0.0f && momentum.x > 0.0f)
+	{
+		speedText << "Current Speed: " << int((-momentum.z + momentum.x) * 1000);
+	}
+	else if (momentum.z > 0.0f && momentum.x < 0.0f)
+	{
+		speedText << "Current Speed: " << int((momentum.z + -momentum.x) * 1000);
+	}
+	else
+	{
+		speedText << "Current Speed: " << int((momentum.z + momentum.x) * 1000);
+	}
+	font->Draw(speedText.str(), 80, 600, kRed);
+	speedText.str("");
+}
+
+
 void main()
 {
 	// Create a 3D engine (using TLX engine here) and open a window for it
@@ -325,6 +356,7 @@ void main()
 		
 		if (gameState == Waiting)
 		{
+			speedOutput(myFont);
 			myFont->Draw("Press Space to Start!", 150, 50, kRed);
 			if (myEngine->KeyHit(SpaceBar))
 			{
@@ -333,6 +365,7 @@ void main()
 		}
 		if (gameState == Countdown)
 		{
+			speedOutput(myFont);
 			if (counter <= 4.0f && counter > 3.1f)
 			{
 				myFont->Draw("3..", 150, 50, kRed);
@@ -359,7 +392,7 @@ void main()
 		}
 		if (gameState == Go)
 		{
-			myFont->Draw(" ", 80, 600, kBlue);
+			speedOutput(myFont);
 			carFloaty(car);
 			carMovement(car);
 			//cameraControl(mouseMoveX, mouseMoveY, myEngine, camera);
@@ -375,7 +408,8 @@ void main()
 		}
 		if (gameState == FirstCheckpoint)
 		{
-			myFont->Draw("Stage 1 Complete", 80, 600, kRed);
+			speedOutput(myFont);
+			myFont->Draw("Stage 1 Complete", 85, 630, kRed);
 			carFloaty(car);
 			carMovement(car);
 			//cameraControl(mouseMoveX, mouseMoveY, myEngine, camera);
@@ -391,7 +425,7 @@ void main()
 		}
 		if (gameState == Finish)
 		{
-			myFont->Draw("Race Complete!", 80, 600, kGreen);
+			myFont->Draw("Race Complete!", 85, 630, kGreen);
 			carFloaty(car);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera);
 			legCollision(car, legdummy);
