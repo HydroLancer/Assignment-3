@@ -9,15 +9,6 @@
 
 using namespace std;
 using namespace tle;
-bool floatingUp = true;
-float timer;
-
-struct checkpoints
-{
-	float x;
-	float z;
-	
-};
 
 struct vectors
 {
@@ -42,72 +33,79 @@ vectors momentum{ 0.0f, 0.0f };		//Actual movement of the car {X, Z}
 vectors thrust{ 0.0f, 0.0f };		//thrust/drag used in calculations for momentum
 vectors drag{ 0.0f, 0.0f };
 
-enum currentState {Waiting, Countdown, Go, FirstCheckpoint, Finish};
+enum currentState {Waiting, Countdown, Go, FirstCheckpoint, SecondCheckpoint, Finish};
 
 I3DEngine* myEngine = New3DEngine(kTLX);
 
+float timer;
 float maxSpeed = 0.02f;
 
+// general car controls
 EKeyCode forwards = Key_W;
 EKeyCode backwards = Key_S;
 EKeyCode rightTurn = Key_D;
 EKeyCode leftTurn = Key_A;
 EKeyCode quit = Key_Escape;
+EKeyCode SpaceBar = Key_Space;
 
+//camera controls
+EKeyCode cameraReset = Key_1;
+EKeyCode cameraFP = Key_2;
 EKeyCode cameraForward = Key_Up;
 EKeyCode cameraBackward = Key_Down;
 EKeyCode cameraRight = Key_Right;
 EKeyCode cameraLeft = Key_Left;
-EKeyCode SpaceBar = Key_Space;
 
-float mouseMoveX;
-float mouseMoveY;
-
-float carOldX;
-float carOldZ;
-
-float maxRotation = 0.1;
-
-float rotateSpeed = 50.0f;
-
-float cameraSpeed = 3.0f;
-
-float dragFactor = -0.5f;
-float thrustFactor = 0.02f;
-float bumpFactor = 0.6f;
-
-float floatspeed = 0.0002f;
-float currentfloat = 0.0f;
-float floatLimit = 0.4f;
+float cameraSpeed = 3.0f;		//moving the camera around *not rotating*
 
 float carRadius = 6.0f;
-float wallWidth = 2.0f;
-float wallLength = 10.0f;
-float checkpointInX = 9.5f;
+
+float checkpointInX = 9.7f;		//bounding area for the area inside the checkpoint
 float checkpointinZ = 2.0f;
 
-float checkpointZSpawn[2] = { 0.0f, 100.0f };
-float checkpointXSpawn[2] = { 0.0f, 0.0f };
+float checkpointZSpawn[3] = { 0.0f, 150.0f, 300.0f };
+float checkpointXSpawn[3] = { 0.0f, 100.0f, 75.0f };
 float checkpointRadius = 0.64f;
 
-float checkpointMinX, checkpointMaxX, checkpointMinZ, checkpointMaxZ;
+//spawn locations for isles/walls (collision function handles them as 1 object)
+float islexSpawn[18] = { -15.0f, 15.0f, -15.0f, 15.0f, -15.0f, 15.0f,
+						85.0f, 115.0f, 85.0f, 115.0f, 85.0f, 115.0f,
+						60.0f, 90.0f, 60.0f, 90.0f, 60.0f, 90.0f };
 
-float wallZSpawn = 46.0f;
-float wallXSpawn[2] = { -10.5f, 9.5f };
-float isleXSpawn[4] = { 10.0f, -10.0f, 10.0f, -10.0f };
-float isleZSpawn[4] = { 40.0f, 40.0f, 53.0f, 53.0f  };
+float islezSpawn[18] = { 0.0f, 0.0f, 15.0f, 15.0f ,-15.0f, -15.0f,
+						150.0f, 150.0f, 135.0f, 135.0f, 165.0f, 165.0f, 
+						300.0f, 300.0f, 315.0f, 315.0f, 285.0f, 285.0f };
 
-float legPos = 9.86f;
+float wallxSpawn[12] = { -15.0f, 15.0f, -15.0f, 15.0f,
+						85.0f, 115.0f, 85.0f, 115.0f, 
+						60.0f, 90.0f, 60.0f, 90.0f };
+
+float wallzSpawn[12] = { 7.5f, 7.5f, -7.5f, -7.5f,
+						142.5f, 142.5f, 157.5f, 157.f, 
+						307.5f, 307.5f, 292.5f, 292.5f };
+
+//locations for tanks
+float tankxSpawn[5] = { -10.0f, 50.0f, 75.0f, 50.0f, 100.0f };
+float tankzSpawn[5] = { 50.0f, 100.0f, 50.0f, 200.0f, 220.0f };
+
+float checkpointMinX, checkpointMaxX, checkpointMinZ, checkpointMaxZ; //used for checkpoint collision
+
+float legPos = 9.86f;		//local position of the checkpoint legs. used to place dummies
 
 float counter = 4.0f;		//used to countdown
 
-float carMatrix[4][4];
+float carMatrix[4][4];		//for getting facing vector!
 
-
-
-//Deals with car movement (Using functions above. Scalar multiplaction to calculate thrust using drag, and momentum.
+///////////////////////////
+//		FUNCTIONS! :D	// ---------------------------------------------------------------------------------------------
+/////////////////////////
+//Deals with car movement (Scalar multiplaction to calculate thrust using drag, and momentum.
 void carMovement(IModel* car)
 {
+	float dragFactor = -0.5f;
+	float thrustFactor = 0.02f;
+	float rotateSpeed = 50.0f;		//car turining speed!
+
 	car->GetMatrix(&carMatrix[0][0]);
 	vectors facingVector = { carMatrix[2][0], carMatrix[2][2] };
 
@@ -153,8 +151,13 @@ void carMovement(IModel* car)
 }
 
 //Floaty!
+bool floatingUp = true;
 void carFloaty(IModel* model)
 {
+	float floatspeed = 0.0002f;
+	float currentfloat = 0.0f;
+	float floatLimit = 0.4f;
+
 	if (floatingUp == true)
 	{
 		model->MoveY(floatspeed);
@@ -173,7 +176,10 @@ void carFloaty(IModel* model)
 	}
 }
 
-void cameraControl(float mouseX, float mouseY, I3DEngine* myEngine, ICamera* camera)
+//Uses mouse to look around, 1 resets, 2 puts it into First Person
+float mouseMoveX;
+float mouseMoveY;
+void cameraControl(float mouseX, float mouseY, I3DEngine* myEngine, ICamera* camera, IModel* car)
 {
 	mouseMoveX = myEngine->GetMouseMovementY();
 	mouseMoveY = myEngine->GetMouseMovementX();
@@ -197,12 +203,24 @@ void cameraControl(float mouseX, float mouseY, I3DEngine* myEngine, ICamera* cam
 	{
 		camera->MoveX(cameraSpeed * timer);
 	}
+	if (myEngine->KeyHit(cameraReset))
+	{
+		camera->SetLocalPosition(0.0f, 10.0f, -20.0f);
+		camera->ResetOrientation();
+		camera->RotateLocalX(20.0f);
+	}
+	if (myEngine->KeyHit(cameraFP))
+	{
+		camera->SetLocalPosition(0.0f, 5.3f, 0.0f);
+		camera->ResetOrientation();
+	}
 }
 
+//possibly merge into one function with walls. Currently just handles collision with checkpoint legs
 void legCollision(IModel* car, IModel* dummy[])
 {
 	//checkpoint detection (legs)
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < 6; i++)
 	{
 		float x = car->GetX() - dummy[i]->GetX();
 		float z = car->GetZ() - dummy[i]->GetZ();
@@ -217,9 +235,15 @@ void legCollision(IModel* car, IModel* dummy[])
 	}
 }
 
-void wallCollision(IModel* wall[], IModel* car)
+//same as above but for walls(inc isles) & tanks
+void wallCollision(IModel* wall[], IModel* car, IModel* tank[], IModel* tank2)
 {
-	for (int i = 0; i < 2; i++)
+	float wallWidth = 2.0f;			//includes isle for simplicity
+	float wallLength = 10.0f;		//includes isle for simplicity
+	float tankradius = 4.5f;
+
+	//Sphere to box collision
+	for (int i = 0; i < 12; i++)
 	{
 		float wallMinX,	wallMaxX, wallMinZ, wallMaxZ;
 		wallMinX = wall[i]->GetX() - wallWidth;
@@ -230,13 +254,41 @@ void wallCollision(IModel* wall[], IModel* car)
 		if (car->GetX() > wallMinX && car->GetX() < wallMaxX
 			&& car->GetZ() > wallMinZ && car->GetZ() < wallMaxZ)
 		{
-			momentum = { -momentum.x , -momentum.z};
-			thrust = { 0.0f, 0.0f };
+			momentum = { -momentum.x , -momentum.z};	//boing!
+			thrust = { 0.0f, 0.0f };					//stops the car keeping on going forward.
 
+		}
+	}
+	//tank collision (sphere-to-sphere)
+	for (int i = 0; i < 4; i++)
+	{
+		float x = car->GetX() - tank[i]->GetX();
+		float z = car->GetZ() - tank[i]->GetZ();
+
+		float distance = sqrt(x * x + z * z);
+
+		if (distance < carRadius + checkpointRadius) //Sphere to sphere detection for tanks.
+		{
+			momentum = { -momentum.x, -momentum.z };
+			thrust = { -thrust.x, thrust.z };
+		}
+	}
+	for (int i = 0; i < 1; i++)
+	{
+		float x = car->GetX() - tank2->GetX();
+		float z = car->GetZ() - tank2->GetZ();
+
+		float distance = sqrt(x * x + z * z);
+
+		if (distance < carRadius + checkpointRadius) //Sphere to sphere detection for tanks.
+		{
+			momentum = { -momentum.x, -momentum.z };
+			thrust = { -thrust.x, thrust.z };
 		}
 	}
 }
 
+//gets the checkpoint inside area for stage changing
 void getCheckpoint(IModel* checkpoint)
 {
 	checkpointMinX = checkpoint->GetX() - checkpointInX;
@@ -245,6 +297,7 @@ void getCheckpoint(IModel* checkpoint)
 	checkpointMaxZ = checkpoint->GetZ() + checkpointinZ;
 }
 
+//text output for nyooms.
 void speedOutput(IFont* font)
 {
 	stringstream speedText;
@@ -271,7 +324,7 @@ void speedOutput(IFont* font)
 	font->Draw(speedText.str(), 80, 600, kRed);
 	speedText.str("");
 }
-
+//----------------------------------------------------------------------------------------------------------------------------
 
 void main()
 {
@@ -279,7 +332,7 @@ void main()
 	myEngine->StartWindowed();
 
 	// Add default folder for meshes and other media
-	myEngine->AddMediaFolder( "E:\\Uni Stuff!\\CO1301 - Games Concepts\\Assignments\\Assignment 3\\media" );
+	myEngine->AddMediaFolder("E:\\Uni Stuff!\\CO1301 - Games Concepts\\Assignments\\Assignment 3\\media");
 
 	/**** Set up your scene here ****/
 
@@ -287,7 +340,8 @@ void main()
 	ICamera* camera = myEngine->CreateCamera(kManual, 0.0f, 10.0f, -20.0f);
 	camera->RotateLocalX(20.0f);
 
-	ISprite* uiElement = myEngine->CreateSprite("testUI.png", 40, 560);
+	IFont* myFont = myEngine->LoadFont("Charlemagne std", 30);
+	ISprite* uiElement = myEngine->CreateSprite("testUI.png", 40, 560);		//UI at bottom of screen
 
 	IMesh* skyboxMesh = myEngine->LoadMesh("Skybox 07.x");
 	IModel* skybox = skyboxMesh->CreateModel(0.0f, -960.0f, 0.0f);
@@ -295,20 +349,24 @@ void main()
 	IMesh* floorMesh = myEngine->LoadMesh("ground.x");
 	IModel* floor = floorMesh->CreateModel(0, 0, 0);
 
-	IMesh* dummyMesh = myEngine->LoadMesh("dummy.x");
+	IMesh* dummyMesh = myEngine->LoadMesh("dummy.x");				//various dummies around the game for collision junk
 
 	IMesh* carMesh = myEngine->LoadMesh("race2.x");
 	IModel* car = carMesh->CreateModel(0.0f, 0.01f, -50.0f);
-	IMesh* checkpointMesh = myEngine->LoadMesh("Checkpoint.x");
-	IModel* checkpoint[2];
-	IModel* legdummy[4];
-	
 
-	for (int i = 0; i < 2; i++)
+	IMesh* checkpointMesh = myEngine->LoadMesh("Checkpoint.x");
+	IModel* checkpoint[3];
+	IModel* legdummy[6];
+
+	//Checkpoint leg dummies... I'm sure there's a more efficient way.. :( 
+	//(have considered for loops, but then numbers were confusing me)
+	{
+	for (int i = 0; i < 3; i++)
 	{
 		checkpoint[i] = checkpointMesh->CreateModel(checkpointXSpawn[i], 0, checkpointZSpawn[i]);
 	}
-	
+
+	//Dummy for checkpoint leg collision
 	legdummy[0] = dummyMesh->CreateModel(legPos, 0, 0);
 	legdummy[0]->AttachToParent(checkpoint[0]);
 
@@ -320,31 +378,46 @@ void main()
 
 	legdummy[3] = dummyMesh->CreateModel(-legPos, 0, 0);
 	legdummy[3]->AttachToParent(checkpoint[1]);
-	
 
+	legdummy[4] = dummyMesh->CreateModel(legPos, 0, 0);
+	legdummy[4]->AttachToParent(checkpoint[2]);
+
+	legdummy[5] = dummyMesh->CreateModel(-legPos, 0, 0);
+	legdummy[5]->AttachToParent(checkpoint[2]);
+}
+
+	//Loading walls-----------------------------------------------------------
 	IMesh* isleMesh = myEngine->LoadMesh("IsleStraight.x");
-	IModel* isle[4];
+	IModel* isle[18];
+	for (int i = 0; i < 18; i++)
+	{
+		isle[i] = isleMesh->CreateModel(islexSpawn[i], 0, islezSpawn[i]);
+	}
 
 	IMesh* wallMesh = myEngine->LoadMesh("Wall.x");
-	IModel* wall[2];
-
-	IFont* myFont = myEngine->LoadFont("Charlemagne std", 30);
-
-	//Loading walls
-	for (int i = 0; i < 2; i++)
+	IModel* wall[12];
+	for (int i = 0; i < 12; i++)
 	{
-		wall[i] = wallMesh->CreateModel(wallXSpawn[i], 0, wallZSpawn);
+		wall[i] = wallMesh->CreateModel(wallxSpawn[i], 0, wallzSpawn[i]);
 	}
-	//isles
-	for (int j = 0; j < 4; j++)
-	{
-		isle[j] = isleMesh->CreateModel(isleXSpawn[j], 0, isleZSpawn[j]);
-	}
-	currentState gameState = Waiting;
+	//------------------------------------------------------------------------
 
+	//tank tiem---------------------------------------------------------------
+	IMesh* tankMesh = myEngine->LoadMesh("TankSmall2.x");
+	IModel* tank[4];
+	for (int i = 0; i < 4; i++)
+	{
+		tank[i] = tankMesh->CreateModel(tankxSpawn[i], 0, tankzSpawn[i]);
+	}
+
+	IMesh* floorTankMesh = myEngine->LoadMesh("TankSmall1.x");
+	IModel* floorTank = tankMesh->CreateModel(80, -5, 100);
+	floorTank->RotateZ(20.0f);
+	//------------------------------------------------------------------------
 	camera->AttachToParent(car);
 	timer = myEngine->Timer();
 
+	currentState gameState = Waiting; //initial state
 	// The main game loop, repeat until engine is stopped
 	while (myEngine->IsRunning())
 	{
@@ -395,9 +468,9 @@ void main()
 			speedOutput(myFont);
 			carFloaty(car);
 			carMovement(car);
-			//cameraControl(mouseMoveX, mouseMoveY, myEngine, camera);
+			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
 			legCollision(car, legdummy);
-			wallCollision(wall, car);
+			wallCollision(wall, car, tank, floorTank);
 
 			getCheckpoint(checkpoint[0]);
 			if (car->GetX() > checkpointMinX + carRadius && car->GetX() < checkpointMaxX + carRadius 
@@ -412,12 +485,28 @@ void main()
 			myFont->Draw("Stage 1 Complete", 85, 630, kRed);
 			carFloaty(car);
 			carMovement(car);
-			//cameraControl(mouseMoveX, mouseMoveY, myEngine, camera);
+			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
 			legCollision(car, legdummy);
-			wallCollision(wall, car);
+			wallCollision(wall, car, tank, floorTank);
 
 			getCheckpoint(checkpoint[1]);
 			if (car->GetX() > checkpointMinX + carRadius && car->GetX() < checkpointMaxX + carRadius 
+				&& car->GetZ() > checkpointMinZ + carRadius && car->GetZ() < checkpointMaxZ + carRadius)
+			{
+				gameState = SecondCheckpoint;
+			}
+		}
+		if (gameState == SecondCheckpoint)
+		{
+			speedOutput(myFont);
+			myFont->Draw("Stage 2 Complete", 85, 630, kRed);
+			carFloaty(car);
+			carMovement(car);
+			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
+			legCollision(car, legdummy);
+			wallCollision(wall, car, tank, floorTank);
+			getCheckpoint(checkpoint[2]);
+			if (car->GetX() > checkpointMinX + carRadius && car->GetX() < checkpointMaxX + carRadius
 				&& car->GetZ() > checkpointMinZ + carRadius && car->GetZ() < checkpointMaxZ + carRadius)
 			{
 				gameState = Finish;
@@ -427,9 +516,7 @@ void main()
 		{
 			myFont->Draw("Race Complete!", 85, 630, kGreen);
 			carFloaty(car);
-			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera);
-			legCollision(car, legdummy);
-			wallCollision(wall, car);
+			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
 		}
 		if (myEngine->KeyHit(quit))
 		{
@@ -441,5 +528,3 @@ void main()
 	// Delete the 3D engine now we are finished with it
 	myEngine->Delete();
 }
-
-
