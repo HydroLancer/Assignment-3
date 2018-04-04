@@ -56,8 +56,9 @@ const float cameraSpeed = 3.0f;		//moving the camera around *not rotating*
 
 const float carRadius = 6.0f;
 float maxSpeed = 0.02f;
+int carHealth = 100;
 
-const float checkpointInX = 9.7f;		//bounding area for the area inside the checkpoint
+const float checkpointInX = 9.5f;		//bounding area for the area inside the checkpoint
 const float checkpointinZ = 2.0f;
 
 float checkpointZSpawn[4] = { 0.0f, 150.0f, 300.0f, 250.0f };
@@ -236,6 +237,7 @@ void legCollision(IModel* car, IModel* dummy[])
 		{
 			momentum = { -momentum.x, -momentum.z };
 			thrust = { -thrust.x, thrust.z };
+			carHealth -= 1;
 		}
 	}
 }
@@ -261,7 +263,7 @@ void wallCollision(IModel* wall[], IModel* car, IModel* tank[], IModel* tank2)
 		{
 			momentum = { -momentum.x , -momentum.z};	//boing!
 			thrust = { 0.0f, 0.0f };					//stops the car keeping on going forward.
-
+			carHealth -= 1;
 		}
 	}
 	//tank collision (sphere-to-sphere)
@@ -276,6 +278,7 @@ void wallCollision(IModel* wall[], IModel* car, IModel* tank[], IModel* tank2)
 		{
 			momentum = { -momentum.x, -momentum.z };
 			thrust = { -thrust.x, thrust.z };
+			carHealth -= 1;
 		}
 	}
 	for (int i = 0; i < 1; i++)
@@ -289,6 +292,7 @@ void wallCollision(IModel* wall[], IModel* car, IModel* tank[], IModel* tank2)
 		{
 			momentum = { -momentum.x, -momentum.z };
 			thrust = { -thrust.x, thrust.z };
+			carHealth -= 1;
 		}
 	}
 }
@@ -306,27 +310,35 @@ void getCheckpoint(IModel* checkpoint)
 void speedOutput(IFont* font)
 {
 	stringstream speedText;
+	stringstream carStatus;
+
 	if (momentum.z < 0.0f && momentum.x < 0.0f)
 	{
-		speedText << "Current Speed: " << int((-momentum.z + -momentum.x) * 1000);
+		speedText << int((-momentum.z + -momentum.x) * 1000);
+		carStatus << int(carHealth) << "%";
 	}
 	else if (momentum.z > 0.0f && momentum.x > 0.0f)
 	{
-		speedText << "Current Speed: " << int((momentum.z + momentum.x)* 1000);
+		speedText << int((momentum.z + momentum.x)* 1000);
+		carStatus << int(carHealth) << "%";
 	}
 	else if (momentum.z < 0.0f && momentum.x > 0.0f)
 	{
-		speedText << "Current Speed: " << int((-momentum.z + momentum.x) * 1000);
+		speedText << int((-momentum.z + momentum.x) * 1000);
+		carStatus << int(carHealth) << "%";
 	}
 	else if (momentum.z > 0.0f && momentum.x < 0.0f)
 	{
-		speedText << "Current Speed: " << int((momentum.z + -momentum.x) * 1000);
+		speedText << int((momentum.z + -momentum.x) * 1000);
+		carStatus << int(carHealth) << "%";
 	}
 	else
 	{
-		speedText << "Current Speed: " << int((momentum.z + momentum.x) * 1000);
+		speedText << int((momentum.z + momentum.x) * 1000);
+		carStatus << int(carHealth) << "%";
 	}
-	font->Draw(speedText.str(), 80, 600, kRed);
+	font->Draw(carStatus.str(), 850, 625, kRed);
+	font->Draw(speedText.str(), 328, 617, kBlack);
 	speedText.str("");
 }
 //----------------------------------------------------------------------------------------------------------------------------
@@ -347,8 +359,8 @@ void main()
 	ICamera* camera = myEngine->CreateCamera(kManual, 0.0f, 10.0f, -20.0f);
 	camera->RotateLocalX(20.0f);
 
-	IFont* myFont = myEngine->LoadFont("Charlemagne std", 30);
-	ISprite* uiElement = myEngine->CreateSprite("testUI.png", 40, 560);		//UI at bottom of screen
+	IFont* myFont = myEngine->LoadFont("Elephant", 30);
+	ISprite* uiElement = myEngine->CreateSprite("testUI.png", 250, 560);		//UI at bottom of screen
 
 	IMesh* skyboxMesh = myEngine->LoadMesh("Skybox 07.x");
 	IModel* skybox = skyboxMesh->CreateModel(0.0f, -960.0f, 0.0f);
@@ -442,7 +454,7 @@ void main()
 		
 		if (gameState == Waiting)
 		{
-			myFont->Draw("Press Space to Start!", 150, 50, kRed);
+			myFont->Draw("Press Space to Start!", 500, 625, kRed);
 			if (myEngine->KeyHit(SpaceBar))
 			{
 				gameState = Countdown;
@@ -452,23 +464,23 @@ void main()
 		{
 			if (counter <= 4.0f && counter > 3.1f)
 			{
-				myFont->Draw("3..", 150, 50, kRed);
+				myFont->Draw("3..", 850, 625, kRed);
 			}
 			if (counter < 3.0f && counter > 2.0f)
 			{
-				myFont->Draw("2..", 150, 50, kRed );
+				myFont->Draw("2..", 850, 625, kRed );
 			}
 			if (counter < 2.0f && counter > 1.0f)
 			{
-				myFont->Draw("1..", 150, 50, kRed);
+				myFont->Draw("1..", 850, 625, kRed);
 			}
 			if (counter < 1.0f && counter > 0.0f)
 			{
-				myFont->Draw("Go!", 150, 50, kGreen);
+				myFont->Draw("Go!", 850, 625, kBlack);
 			}
 			if (counter < 0.0f)
 			{
-				myFont->Draw("Go!", 150, 50, kGreen);
+				myFont->Draw("Go!", 850, 625, kBlack);
 				gameState = Go;
 			}
 
@@ -493,7 +505,7 @@ void main()
 		if (gameState == FirstCheckpoint)
 		{
 			speedOutput(myFont);
-			myFont->Draw("Stage 1 Complete", 85, 630, kRed);
+			myFont->Draw("Stage 1 Complete", 500, 625, kBlack);
 			carFloaty(car);
 			carMovement(car);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
@@ -510,7 +522,7 @@ void main()
 		if (gameState == SecondCheckpoint)
 		{
 			speedOutput(myFont);
-			myFont->Draw("Stage 2 Complete", 85, 630, kRed);
+			myFont->Draw("Stage 2 Complete", 500, 625, kBlack);
 			carFloaty(car);
 			carMovement(car);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
@@ -526,7 +538,8 @@ void main()
 		if (gameState == ThirdCheckpoint)
 		{
 			speedOutput(myFont);
-			myFont->Draw("Stage 3 Complete", 85, 630, kRed);
+			myFont->Draw("Stage 3 Complete", 500, 625, kBlack);
+			myFont->Draw(" ", 850, 625, kRed);
 			carFloaty(car);
 			carMovement(car);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
@@ -541,9 +554,11 @@ void main()
 		}
 		if (gameState == Finish)
 		{
-			myFont->Draw("Race Complete!", 85, 630, kGreen);
+			myFont->Draw("Race Complete!", 500, 625, kGreen);
 			carMovement(car);
 			carFloaty(car);
+			legCollision(car, legdummy);
+			wallCollision(wall, car, tank, floorTank);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
 		}
 		if (myEngine->KeyHit(quit))
