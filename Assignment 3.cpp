@@ -57,6 +57,13 @@ const float cameraSpeed = 3.0f;		//moving the camera around *not rotating*
 const float carRadius = 6.0f;
 float maxSpeed = 0.02f;
 int carHealth = 100;
+float thrustFactor = 0.02f;
+
+
+float originalMax = 0.02f;
+float boostSpeed = 0.04f;
+float heatTimer = 4.0f;
+float cooldown = 5.0f;
 
 const float checkpointInX = 9.5f;		//bounding area for the area inside the checkpoint
 const float checkpointinZ = 2.0f;
@@ -91,8 +98,8 @@ float wallzSpawn[20] = { 7.5f, 7.5f, -7.5f, -7.5f,
 						257.5f, 242.5f, 257.5f, 242.5f };
 
 //locations for tanks
-float tankxSpawn[8] = { -5.0f, 50.0f, 45.0f, 50.0f, 100.0f, 80.0f, 90.0f, 100.0f };
-float tankzSpawn[8] = { 40.0f, 100.0f, 20.0f, 220.0f, 260.0f, 350.0f, 350.0f, 350.0f };
+float tankxSpawn[11] = { -5.0f, 50.0f, 45.0f, 50.0f, 100.0f, 80.0f, 90.0f, 100.0f, 70.0f, 110.0f, 120.0f };
+float tankzSpawn[11] = { 40.0f, 100.0f, 20.0f, 220.0f, 260.0f, 350.0f, 350.0f, 350.0f, 350.0f, 350.0f, 350.0f };
 
 float checkpointMinX, checkpointMaxX, checkpointMinZ, checkpointMaxZ; //used for checkpoint collision
 
@@ -105,11 +112,13 @@ float carMatrix[4][4];		//for getting facing vector!
 ///////////////////////////
 //		FUNCTIONS! :D	// ---------------------------------------------------------------------------------------------
 /////////////////////////
+
+//Speed Boost! (Not working fully atm..)
 //Deals with car movement (Scalar multiplaction to calculate thrust using drag, and momentum.
-void carMovement(IModel* car)
+void carMovement(IModel* car, IFont* font)
 {
+	
 	float dragFactor = -0.5f;
-	float thrustFactor = 0.02f;
 	float rotateSpeed = 50.0f;		//car turining speed!
 
 	car->GetMatrix(&carMatrix[0][0]);
@@ -127,7 +136,7 @@ void carMovement(IModel* car)
 	if (myEngine->KeyHeld(forwards))
 	{
 		//Makes sure the car just can't endlessly accelerate
-		if (momentum.z > maxSpeed || momentum.z > maxSpeed || momentum.z < -maxSpeed || momentum.x < -maxSpeed)
+		if (momentum.z > maxSpeed || momentum.x > maxSpeed || momentum.z < -maxSpeed || momentum.x < -maxSpeed)
 		{
 			thrust = { 0.0f, 0.0f };
 		}
@@ -147,6 +156,46 @@ void carMovement(IModel* car)
 	{
 		thrust = scalar(-thrustFactor * timer, facingVector);
 	}
+
+	//boostin' << ?? Currently sometimes when you boost it halves your speed
+	/*stringstream boostStatus;
+
+	if (myEngine->KeyHeld(SpaceBar) && heatTimer > 0.0f && cooldown >= 5.0f)
+	{
+		thrustFactor = boostSpeed;
+		heatTimer -= timer;
+
+		font->Draw("BOOSTING!", 500, 645, kRed);
+		boostStatus << "Time Left: " << heatTimer;
+		font->Draw(boostStatus.str(), 500, 670, kRed);
+		boostStatus.str("");
+
+		if (heatTimer < 0.0f)
+		{
+			momentum = { momentum.x / 3, momentum.z / 3 };
+			thrustFactor = originalMax;
+		}
+	}
+	else
+	{
+		if (heatTimer > 0.0f && heatTimer < 4.0f)
+		{
+			thrustFactor = originalMax;
+			heatTimer += timer;
+		}
+		if (heatTimer <= 4.0f)
+		{
+			thrustFactor = originalMax;
+		}
+	}
+
+	if (heatTimer < 0.0f || cooldown < 5.0f)
+	{
+		stringstream cooldownTimer;
+		maxSpeed = originalMax;
+		cooldown += timer;
+		cooldownTimer << "Overheated! Cooling down.. " << cooldown;
+	}*/
 
 	//nyoom
 	drag = scalar(dragFactor * timer, momentum);
@@ -267,7 +316,7 @@ void wallCollision(IModel* wall[], IModel* car, IModel* tank[], IModel* tank2)
 		}
 	}
 	//tank collision (sphere-to-sphere)
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < 11; i++)
 	{
 		float x = car->GetX() - tank[i]->GetX();
 		float z = car->GetZ() - tank[i]->GetZ();
@@ -429,8 +478,8 @@ void main()
 
 	//tank tiem---------------------------------------------------------------
 	IMesh* tankMesh = myEngine->LoadMesh("TankSmall2.x");
-	IModel* tank[8];
-	for (int i = 0; i < 8; i++)
+	IModel* tank[11];
+	for (int i = 0; i < 11; i++)
 	{
 		tank[i] = tankMesh->CreateModel(tankxSpawn[i], 0, tankzSpawn[i]);
 	}
@@ -488,9 +537,10 @@ void main()
 		}
 		if (gameState == Go)
 		{
+			carMovement(car, myFont);
+			boost(myFont);
 			speedOutput(myFont);
 			carFloaty(car);
-			carMovement(car);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
 			legCollision(car, legdummy);
 			wallCollision(wall, car, tank, floorTank);
@@ -504,10 +554,11 @@ void main()
 		}
 		if (gameState == FirstCheckpoint)
 		{
+			boost(myFont);
 			speedOutput(myFont);
 			myFont->Draw("Stage 1 Complete", 500, 625, kBlack);
 			carFloaty(car);
-			carMovement(car);
+			carMovement(car, myFont);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
 			legCollision(car, legdummy);
 			wallCollision(wall, car, tank, floorTank);
@@ -521,10 +572,11 @@ void main()
 		}
 		if (gameState == SecondCheckpoint)
 		{
+			boost(myFont);
 			speedOutput(myFont);
 			myFont->Draw("Stage 2 Complete", 500, 625, kBlack);
 			carFloaty(car);
-			carMovement(car);
+			carMovement(car, myFont);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
 			legCollision(car, legdummy);
 			wallCollision(wall, car, tank, floorTank);
@@ -537,11 +589,12 @@ void main()
 		}
 		if (gameState == ThirdCheckpoint)
 		{
+			carMovement(car, myFont);
+			boost(myFont);
 			speedOutput(myFont);
 			myFont->Draw("Stage 3 Complete", 500, 625, kBlack);
 			myFont->Draw(" ", 850, 625, kRed);
 			carFloaty(car);
-			carMovement(car);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
 			legCollision(car, legdummy);
 			wallCollision(wall, car, tank, floorTank);
@@ -555,7 +608,7 @@ void main()
 		if (gameState == Finish)
 		{
 			myFont->Draw("Race Complete!", 500, 625, kGreen);
-			carMovement(car);
+			carMovement(car, myFont);
 			carFloaty(car);
 			legCollision(car, legdummy);
 			wallCollision(wall, car, tank, floorTank);
