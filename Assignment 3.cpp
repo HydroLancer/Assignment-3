@@ -59,10 +59,13 @@ float maxSpeed = 0.02f;
 int carHealth = 100;
 float thrustFactor = 0.02f;
 
+bool isOverheated = false;
 bool isBoosting = false;
 
 float originalMax = 0.02f;
 float boostSpeed = 0.08f;
+float maxHeat = 4.0f;
+float maxCooldown = 5.0f;
 float heatTimer = 4.0f;
 float cooldown = 5.0f;
 
@@ -78,22 +81,22 @@ float islexSpawn[30] = { -15.0f, 15.0f, -15.0f, 15.0f, -15.0f, 15.0f,
 						85.0f, 115.0f, 85.0f, 115.0f, 85.0f, 115.0f,
 						85.0f, 115.0f, 85.0f, 115.0f, 85.0f, 115.0f,
 						60.0f, 90.0f, 60.0f, 90.0f, 60.0f, 90.0f,
-						165.0f, 135.0f, 165.0f, 135.0f, 165.0f, 135.0f};
+						165.0f, 135.0f, 165.0f, 135.0f, 165.0f, 135.0f };
 
 float islezSpawn[30] = { 0.0f, 0.0f, 15.0f, 15.0f ,-15.0f, -15.0f,
-						150.0f, 150.0f, 135.0f, 135.0f, 165.0f, 165.0f, 
+						150.0f, 150.0f, 135.0f, 135.0f, 165.0f, 165.0f,
 						185.0f, 185.0f, 200.0f, 200.0f, 215.0f, 215.0f,
 						300.0f, 300.0f, 315.0f, 315.0f, 285.0f, 285.0f,
 						265.0f, 265.0f, 250.0f, 250.0f, 235.0f, 235.0f };
 
 float wallxSpawn[20] = { -15.0f, 15.0f, -15.0f, 15.0f,
-						85.0f, 115.0f, 85.0f, 115.0f, 
+						85.0f, 115.0f, 85.0f, 115.0f,
 						85.0f, 115.0f, 85.0f, 115.0f,
 						60.0f, 90.0f, 60.0f, 90.0f,
-						165.0f, 165.0f, 135.0f, 135.0f};
+						165.0f, 165.0f, 135.0f, 135.0f };
 
 float wallzSpawn[20] = { 7.5f, 7.5f, -7.5f, -7.5f,
-						142.5f, 142.5f, 157.5f, 157.f, 
+						142.5f, 142.5f, 157.5f, 157.f,
 						207.5f, 207.5f, 192.5f, 192.5f,
 						307.5f, 307.5f, 292.5f, 292.5f,
 						257.5f, 242.5f, 257.5f, 242.5f };
@@ -110,15 +113,15 @@ float counter = 4.0f;		//used to countdown
 
 float carMatrix[4][4];		//for getting facing vector!
 
-///////////////////////////
-//		FUNCTIONS! :D	// ---------------------------------------------------------------------------------------------
-/////////////////////////
+							///////////////////////////
+							//		FUNCTIONS! :D	// ---------------------------------------------------------------------------------------------
+							/////////////////////////
 
-//Speed Boost! (Not working fully atm..)
-//Deals with car movement (Scalar multiplaction to calculate thrust using drag, and momentum.
+							//Speed Boost! (Not working fully atm..)
+							//Deals with car movement (Scalar multiplaction to calculate thrust using drag, and momentum.
 void carMovement(IModel* car, IFont* font)
 {
-	
+
 	float dragFactor = -0.5f;
 	float rotateSpeed = 50.0f;		//car turining speed!
 
@@ -133,7 +136,7 @@ void carMovement(IModel* car, IFont* font)
 	{
 		car->RotateLocalY(rotateSpeed*timer);
 	}
-	if (isBoosting == false)
+	if (isBoosting == false || (isBoosting == true && isOverheated == true))
 	{
 		if (myEngine->KeyHeld(forwards))
 		{
@@ -162,14 +165,17 @@ void carMovement(IModel* car, IFont* font)
 
 	//boost time
 	stringstream boostStatus;
-
 	if (myEngine->KeyHeld(SpaceBar))
 	{
 		isBoosting = true;
 	}
-	if (myEngine->KeyHeld(SpaceBar) && heatTimer > 0.0f && cooldown >= 5.0f)
+	else
 	{
-		isBoosting = true;
+		isBoosting = false;
+	}
+
+	if (isBoosting == true && isOverheated == false)
+	{
 		thrustFactor = boostSpeed;
 		heatTimer -= timer;
 
@@ -183,31 +189,31 @@ void carMovement(IModel* car, IFont* font)
 			momentum = { momentum.x / 3, momentum.z / 3 };
 			thrustFactor = originalMax;
 			cooldown = 0.0f;
+			isOverheated = true;
+		}
+	}
+	else if (isBoosting == false && isOverheated == false)
+	{
+		thrustFactor = originalMax;
+		if (heatTimer < maxHeat)
+		{
+			heatTimer += timer;
 		}
 	}
 	else
 	{
-		isBoosting = false;
-		if (heatTimer > 0.0f && heatTimer < 4.0f)
-		{
-			thrustFactor = originalMax;
-			heatTimer += timer;
-		}
-		if (heatTimer <= 4.0f)
-		{
-			thrustFactor = originalMax;
-		}
-	}
-
-	if (heatTimer < 0.0f && cooldown < 5.0f)
-	{
 		stringstream cooldownTimer;
-		maxSpeed = originalMax;
+		thrustFactor = originalMax;
 		cooldown += timer;
 		cooldownTimer << int(cooldown);
 		font->Draw("OVERHEAT!", 500, 595, kRed);
 		font->Draw("Cooling down..", 500, 620, kRed);
 		font->Draw(cooldownTimer.str(), 500, 645, kRed);
+		if (cooldown >= maxCooldown)
+		{
+			heatTimer = maxHeat;
+			isOverheated = false;
+		}
 	}
 
 	//nyoom
@@ -294,7 +300,7 @@ void legCollision(IModel* car, IModel* dummy[])
 		float z = car->GetZ() - dummy[i]->GetZ();
 
 		float distance = sqrt(x * x + z * z);
-		
+
 		if (distance < carRadius + checkpointRadius) //Sphere to sphere detection for checkpoint legs.
 		{
 			momentum = { -momentum.x, -momentum.z };
@@ -314,7 +320,7 @@ void wallCollision(IModel* wall[], IModel* car, IModel* tank[], IModel* tank2)
 	//Sphere to box collision
 	for (int i = 0; i < 20; i++)
 	{
-		float wallMinX,	wallMaxX, wallMinZ, wallMaxZ;
+		float wallMinX, wallMaxX, wallMinZ, wallMaxZ;
 		wallMinX = wall[i]->GetX() - wallWidth;
 		wallMaxX = wall[i]->GetX() + wallWidth;
 		wallMinZ = wall[i]->GetZ() - wallLength;
@@ -323,7 +329,7 @@ void wallCollision(IModel* wall[], IModel* car, IModel* tank[], IModel* tank2)
 		if (car->GetX() > wallMinX && car->GetX() < wallMaxX
 			&& car->GetZ() > wallMinZ && car->GetZ() < wallMaxZ)
 		{
-			momentum = { -momentum.x , -momentum.z};	//boing!
+			momentum = { -momentum.x , -momentum.z };	//boing!
 			thrust = { 0.0f, 0.0f };					//stops the car keeping on going forward.
 			carHealth -= 1;
 		}
@@ -381,7 +387,7 @@ void speedOutput(IFont* font)
 	}
 	else if (momentum.z > 0.0f && momentum.x > 0.0f)
 	{
-		speedText << int((momentum.z + momentum.x)* 1000);
+		speedText << int((momentum.z + momentum.x) * 1000);
 		carStatus << int(carHealth) << "%";
 	}
 	else if (momentum.z < 0.0f && momentum.x > 0.0f)
@@ -442,36 +448,36 @@ void main()
 	//Checkpoint leg dummies... I'm sure there's a more efficient way.. :( 
 	//(have considered for loops, but then numbers were confusing me)
 	{
-	for (int i = 0; i < 4; i++)
-	{
-		checkpoint[i] = checkpointMesh->CreateModel(checkpointXSpawn[i], 0, checkpointZSpawn[i]);
+		for (int i = 0; i < 4; i++)
+		{
+			checkpoint[i] = checkpointMesh->CreateModel(checkpointXSpawn[i], 0, checkpointZSpawn[i]);
+		}
+
+		//Dummy for checkpoint leg collision
+		legdummy[0] = dummyMesh->CreateModel(legPos, 0, 0);
+		legdummy[0]->AttachToParent(checkpoint[0]);
+
+		legdummy[1] = dummyMesh->CreateModel(-legPos, 0, 0);
+		legdummy[1]->AttachToParent(checkpoint[0]);
+
+		legdummy[2] = dummyMesh->CreateModel(legPos, 0, 0);
+		legdummy[2]->AttachToParent(checkpoint[1]);
+
+		legdummy[3] = dummyMesh->CreateModel(-legPos, 0, 0);
+		legdummy[3]->AttachToParent(checkpoint[1]);
+
+		legdummy[4] = dummyMesh->CreateModel(legPos, 0, 0);
+		legdummy[4]->AttachToParent(checkpoint[2]);
+
+		legdummy[5] = dummyMesh->CreateModel(-legPos, 0, 0);
+		legdummy[5]->AttachToParent(checkpoint[2]);
+
+		legdummy[6] = dummyMesh->CreateModel(legPos, 0, 0);
+		legdummy[6]->AttachToParent(checkpoint[3]);
+
+		legdummy[7] = dummyMesh->CreateModel(-legPos, 0, 0);
+		legdummy[7]->AttachToParent(checkpoint[3]);
 	}
-
-	//Dummy for checkpoint leg collision
-	legdummy[0] = dummyMesh->CreateModel(legPos, 0, 0);
-	legdummy[0]->AttachToParent(checkpoint[0]);
-
-	legdummy[1] = dummyMesh->CreateModel(-legPos, 0, 0);
-	legdummy[1]->AttachToParent(checkpoint[0]);
-
-	legdummy[2] = dummyMesh->CreateModel(legPos, 0, 0);
-	legdummy[2]->AttachToParent(checkpoint[1]);
-
-	legdummy[3] = dummyMesh->CreateModel(-legPos, 0, 0);
-	legdummy[3]->AttachToParent(checkpoint[1]);
-
-	legdummy[4] = dummyMesh->CreateModel(legPos, 0, 0);
-	legdummy[4]->AttachToParent(checkpoint[2]);
-
-	legdummy[5] = dummyMesh->CreateModel(-legPos, 0, 0);
-	legdummy[5]->AttachToParent(checkpoint[2]);
-
-	legdummy[6] = dummyMesh->CreateModel(legPos, 0, 0);
-	legdummy[6]->AttachToParent(checkpoint[3]);
-
-	legdummy[7] = dummyMesh->CreateModel(-legPos, 0, 0);
-	legdummy[7]->AttachToParent(checkpoint[3]);
-}
 
 	//Loading walls-----------------------------------------------------------
 	IMesh* isleMesh = myEngine->LoadMesh("IsleStraight.x");
@@ -505,7 +511,7 @@ void main()
 	timer = myEngine->Timer();
 
 	currentState gameState = Waiting; //initial state
-	// The main game loop, repeat until engine is stopped
+									  // The main game loop, repeat until engine is stopped
 	while (myEngine->IsRunning())
 	{
 		// Draw the scene
@@ -513,7 +519,7 @@ void main()
 
 		/**** Update your scene each frame here ****/
 		timer = myEngine->Timer();
-		
+
 		if (gameState == Waiting)
 		{
 			myFont->Draw("Press Space to Start!", 500, 625, kRed);
@@ -530,7 +536,7 @@ void main()
 			}
 			if (counter < 3.0f && counter > 2.0f)
 			{
-				myFont->Draw("2..", 850, 625, kRed );
+				myFont->Draw("2..", 850, 625, kRed);
 			}
 			if (counter < 2.0f && counter > 1.0f)
 			{
@@ -558,7 +564,7 @@ void main()
 			wallCollision(wall, car, tank, floorTank);
 
 			getCheckpoint(checkpoint[0]);
-			if (car->GetX() > checkpointMinX + carRadius && car->GetX() < checkpointMaxX + carRadius 
+			if (car->GetX() > checkpointMinX + carRadius && car->GetX() < checkpointMaxX + carRadius
 				&& car->GetZ() > checkpointMinZ + carRadius && car->GetZ() < checkpointMaxZ + carRadius)
 			{
 				gameState = FirstCheckpoint;
@@ -575,7 +581,7 @@ void main()
 			wallCollision(wall, car, tank, floorTank);
 
 			getCheckpoint(checkpoint[1]);
-			if (car->GetX() > checkpointMinX + carRadius && car->GetX() < checkpointMaxX + carRadius 
+			if (car->GetX() > checkpointMinX + carRadius && car->GetX() < checkpointMaxX + carRadius
 				&& car->GetZ() > checkpointMinZ + carRadius && car->GetZ() < checkpointMaxZ + carRadius)
 			{
 				gameState = SecondCheckpoint;
@@ -627,7 +633,7 @@ void main()
 		{
 			myEngine->Stop();
 		}
-		
+
 	}
 
 	// Delete the 3D engine now we are finished with it
