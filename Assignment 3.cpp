@@ -59,9 +59,10 @@ float maxSpeed = 0.02f;
 int carHealth = 100;
 float thrustFactor = 0.02f;
 
+bool isBoosting = false;
 
 float originalMax = 0.02f;
-float boostSpeed = 0.04f;
+float boostSpeed = 0.08f;
 float heatTimer = 4.0f;
 float cooldown = 5.0f;
 
@@ -132,36 +133,43 @@ void carMovement(IModel* car, IFont* font)
 	{
 		car->RotateLocalY(rotateSpeed*timer);
 	}
-
-	if (myEngine->KeyHeld(forwards))
+	if (isBoosting == false)
 	{
-		//Makes sure the car just can't endlessly accelerate
-		if (momentum.z > maxSpeed || momentum.x > maxSpeed || momentum.z < -maxSpeed || momentum.x < -maxSpeed)
+		if (myEngine->KeyHeld(forwards))
+		{
+			//Makes sure the car just can't endlessly accelerate
+			if (momentum.z > maxSpeed || momentum.x > maxSpeed || momentum.z < -maxSpeed || momentum.x < -maxSpeed)
+			{
+				thrust = { 0.0f, 0.0f };
+			}
+			//otherwise, gotta go fast!
+			else
+			{
+				thrust = scalar(thrustFactor * timer, facingVector);
+			}
+		}
+		//stops going fast if you let go of W.
+		else
 		{
 			thrust = { 0.0f, 0.0f };
 		}
-		//otherwise, gotta go fast!
-		else
+		//Beep... Beep... Beep..
+		if (myEngine->KeyHeld(backwards))
 		{
-			thrust = scalar(thrustFactor * timer, facingVector);
+			thrust = scalar(-thrustFactor * timer, facingVector);
 		}
 	}
-	//stops going fast if you let go of W.
-	else
-	{
-		thrust = { 0.0f, 0.0f };
-	}
-	//Beep... Beep... Beep..
-	if (myEngine->KeyHeld(backwards))
-	{
-		thrust = scalar(-thrustFactor * timer, facingVector);
-	}
 
-	//boostin' << ?? Currently sometimes when you boost it halves your speed
-	/*stringstream boostStatus;
+	//boost time
+	stringstream boostStatus;
 
+	if (myEngine->KeyHeld(SpaceBar))
+	{
+		isBoosting = true;
+	}
 	if (myEngine->KeyHeld(SpaceBar) && heatTimer > 0.0f && cooldown >= 5.0f)
 	{
+		isBoosting = true;
 		thrustFactor = boostSpeed;
 		heatTimer -= timer;
 
@@ -174,10 +182,12 @@ void carMovement(IModel* car, IFont* font)
 		{
 			momentum = { momentum.x / 3, momentum.z / 3 };
 			thrustFactor = originalMax;
+			cooldown = 0.0f;
 		}
 	}
 	else
 	{
+		isBoosting = false;
 		if (heatTimer > 0.0f && heatTimer < 4.0f)
 		{
 			thrustFactor = originalMax;
@@ -189,13 +199,16 @@ void carMovement(IModel* car, IFont* font)
 		}
 	}
 
-	if (heatTimer < 0.0f || cooldown < 5.0f)
+	if (heatTimer < 0.0f && cooldown < 5.0f)
 	{
 		stringstream cooldownTimer;
 		maxSpeed = originalMax;
 		cooldown += timer;
-		cooldownTimer << "Overheated! Cooling down.. " << cooldown;
-	}*/
+		cooldownTimer << int(cooldown);
+		font->Draw("OVERHEAT!", 500, 595, kRed);
+		font->Draw("Cooling down..", 500, 620, kRed);
+		font->Draw(cooldownTimer.str(), 500, 645, kRed);
+	}
 
 	//nyoom
 	drag = scalar(dragFactor * timer, momentum);
@@ -538,7 +551,6 @@ void main()
 		if (gameState == Go)
 		{
 			carMovement(car, myFont);
-			boost(myFont);
 			speedOutput(myFont);
 			carFloaty(car);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
@@ -554,7 +566,6 @@ void main()
 		}
 		if (gameState == FirstCheckpoint)
 		{
-			boost(myFont);
 			speedOutput(myFont);
 			myFont->Draw("Stage 1 Complete", 500, 625, kBlack);
 			carFloaty(car);
@@ -572,7 +583,6 @@ void main()
 		}
 		if (gameState == SecondCheckpoint)
 		{
-			boost(myFont);
 			speedOutput(myFont);
 			myFont->Draw("Stage 2 Complete", 500, 625, kBlack);
 			carFloaty(car);
@@ -590,7 +600,6 @@ void main()
 		if (gameState == ThirdCheckpoint)
 		{
 			carMovement(car, myFont);
-			boost(myFont);
 			speedOutput(myFont);
 			myFont->Draw("Stage 3 Complete", 500, 625, kBlack);
 			myFont->Draw(" ", 850, 625, kRed);
