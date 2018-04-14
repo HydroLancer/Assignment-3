@@ -43,6 +43,7 @@ EKeyCode rightTurn = Key_D;
 EKeyCode leftTurn = Key_A;
 EKeyCode quit = Key_Escape;
 EKeyCode SpaceBar = Key_Space;
+EKeyCode gameReset = Key_R;
 ///////////////////////////////////
 //camera controls
 EKeyCode cameraReset = Key_1;
@@ -80,7 +81,7 @@ float checkpointXSpawn[4] = { 0.0f, 100.0f, 75.0f, 150.0f };
 const float checkpointRadius = 0.64f;
 ///////////////////////////////////////////////////////////////////////////////////////////
 //spawn locations for isles/walls (collision function handles them as 1 object)
-float islexSpawn[30] = { -15.0f, 15.0f, -15.0f, 15.0f, -15.0f, 15.0f,
+float islexSpawn[30] = { -7.5f, 7.5f, -7.5f, 7.5f, -7.5f, 7.5f,
 						85.0f, 115.0f, 85.0f, 115.0f, 85.0f, 115.0f,
 						85.0f, 115.0f, 85.0f, 115.0f, 85.0f, 115.0f,
 						60.0f, 90.0f, 60.0f, 90.0f, 60.0f, 90.0f,
@@ -92,7 +93,7 @@ float islezSpawn[30] = { 0.0f, 0.0f, 15.0f, 15.0f ,-15.0f, -15.0f,
 						300.0f, 300.0f, 315.0f, 315.0f, 285.0f, 285.0f,
 						265.0f, 265.0f, 250.0f, 250.0f, 235.0f, 235.0f };
 
-float wallxSpawn[20] = { -15.0f, 15.0f, -15.0f, 15.0f,
+float wallxSpawn[20] = { -7.5f, 7.5f, -7.5f, 7.5f,
 						85.0f, 115.0f, 85.0f, 115.0f,
 						85.0f, 115.0f, 85.0f, 115.0f,
 						60.0f, 90.0f, 60.0f, 90.0f,
@@ -117,6 +118,14 @@ const float legPos = 9.86f;		//local position of the checkpoint legs. used to pl
 float counter = 4.0f;		//used to countdown
 
 float carMatrix[4][4];		//for getting facing vector!
+
+//waypoints for NPC Car
+int currentWaypoint = 0;
+float waypointX[8] = {0.0f, 12.0f, 98.0f, 105.0f, 72.0f, 81.0f, 142.0f, 149.0f};
+float waypointZ[8] = {20.0f, 42.0f, 129.0f, 232.0f, 277.0f, 331.0f, 334.0f, 252.0f};
+
+enum currentState { Waiting, Countdown, Go, FirstCheckpoint, SecondCheckpoint, ThirdCheckpoint, Finish, Dead };
+currentState gameState = Waiting; //initial state
 
 ///////////////////////////
 //		FUNCTIONS! :D	// ---------------------------------------------------------------------------------------------
@@ -228,11 +237,17 @@ void carMovement(IModel* car, IFont* font)
 			isOverheated = false;
 		}
 	}
-
+	
 	//nyoom
 	drag = scalar(dragFactor * timer, momentum);
 	momentum = sum(momentum, thrust, drag);
 
+	if (carHealth < 1)
+	{
+		momentum = { 0.0f, 0.0f };
+		thrust = { 0.0f, 0.0f };
+		gameState = Dead;
+	}
 	car->Move(momentum.x, 0.0f, momentum.z);
 
 }
@@ -303,10 +318,10 @@ void cameraControl(float mouseX, float mouseY, I3DEngine* myEngine, ICamera* cam
 	}
 }
 
-//possibly merge into one function with walls. Currently just handles collision with checkpoint legs
-void legCollision(IModel* car, IModel* dummy[])
+//Collision, Woo! (Includes Walls, Checkpoint Legs, Tanks, NPC car is WIP)
+void Collision(IModel* car, IModel* dummy[], IModel* wall[], IModel* tank[], IModel* tank2, IModel* npc)
 {
-	//checkpoint detection (legs)
+	//Checkpoint Legs (Sphere to Sphere)
 	for (int i = 0; i < 8; i++)
 	{
 		float x = car->GetX() - dummy[i]->GetX();
@@ -321,16 +336,12 @@ void legCollision(IModel* car, IModel* dummy[])
 			carHealth -= 1;
 		}
 	}
-}
-
-//same as above but for walls(inc isles) & tanks
-void wallCollision(IModel* wall[], IModel* car, IModel* tank[], IModel* tank2)
-{
+	
+	//Walls collision (Sphere to Box)
 	float wallWidth = 2.0f;			//includes isle for simplicity
 	float wallLength = 10.0f;		//includes isle for simplicity
 	float tankradius = 4.5f;
-
-	//Sphere to box collision
+	
 	for (int i = 0; i < 20; i++)
 	{
 		float wallMinX, wallMaxX, wallMinZ, wallMaxZ;
@@ -347,7 +358,9 @@ void wallCollision(IModel* wall[], IModel* car, IModel* tank[], IModel* tank2)
 			carHealth -= 1;
 		}
 	}
+
 	//tank collision (sphere-to-sphere)
+	//regular tanks
 	for (int i = 0; i < 11; i++)
 	{
 		float x = car->GetX() - tank[i]->GetX();
@@ -362,6 +375,7 @@ void wallCollision(IModel* wall[], IModel* car, IModel* tank[], IModel* tank2)
 			carHealth -= 1;
 		}
 	}
+	//tank that's in the way
 	for (int i = 0; i < 1; i++)
 	{
 		float x = car->GetX() - tank2->GetX();
@@ -375,6 +389,19 @@ void wallCollision(IModel* wall[], IModel* car, IModel* tank[], IModel* tank2)
 			thrust = { -thrust.x, thrust.z };
 			carHealth -= 1;
 		}
+	}
+
+	//NPC Car (Sphere to Sphere)
+	float x = car->GetX() - npc->GetX();
+	float z = car->GetZ() - npc->GetZ();
+
+	float distance = sqrt(x*x + z * z);
+
+	if (distance < carRadius )
+	{
+		momentum = { -momentum.x, -momentum.z };
+		thrust = { -thrust.x, thrust.z };
+		carHealth -= 5;
 	}
 }
 
@@ -392,7 +419,7 @@ void speedOutput(IFont* font)
 {
 	stringstream speedText; //outputs speed in whole units (Have to multiply by 1k because speed is 0.002 or thereabouts)
 	stringstream carStatus;
-
+	
 	if (momentum.z < 0.0f && momentum.x < 0.0f)
 	{
 		speedText << int((-momentum.z + -momentum.x) * 1000);
@@ -420,11 +447,41 @@ void speedOutput(IFont* font)
 	}
 	font->Draw(carStatus.str(), 850, 625, kRed);
 	font->Draw(speedText.str(), 328, 617, kBlack);
+
 	speedText.str("");
+}
+
+//implementing NPC Movement.. Oh Nooooo (Very basic, little buggy)
+void NPCMovement(IModel* npc, IModel* waypoint[])
+{
+	npc->LookAt(waypoint[currentWaypoint]);
+	npc->MoveLocalZ(0.01);
+
+	//"collision" for waypoints
+	for (int i = currentWaypoint; i < 8; i++)
+	{
+		float x = npc->GetX() - waypoint[i]->GetX();
+		float z = npc->GetZ() - waypoint[i]->GetZ();
+
+		float distance = sqrt(x * x + z * z);
+	
+		if (distance < carRadius + checkpointRadius)
+		{
+			if (currentWaypoint < 7)
+			{
+				currentWaypoint += 1;
+			}
+			else if (currentWaypoint >= 7)
+			{
+				currentWaypoint = 0;
+			}
+		}
+		
+	}
+	
 }
 //----------------------------------------------------------------------------------------------------------------------------
 
-enum currentState { Waiting, Countdown, Go, FirstCheckpoint, SecondCheckpoint, ThirdCheckpoint, Finish };
 
 void main()
 {
@@ -453,6 +510,8 @@ void main()
 																																//
 	IMesh* carMesh = myEngine->LoadMesh("race2.x");																				//
 	IModel* car = carMesh->CreateModel(0.0f, 0.01f, -50.0f);																	//
+	IModel* npcCar = carMesh->CreateModel(0.0f, 0.0f, -10.0f);																	//
+	npcCar->SetSkin("sp02-01test.jpg");																							//
 																																//
 	IMesh* checkpointMesh = myEngine->LoadMesh("Checkpoint.x");																	//
 	IModel* checkpoint[4];																										//
@@ -467,7 +526,7 @@ void main()
 		{
 			checkpoint[i] = checkpointMesh->CreateModel(checkpointXSpawn[i], 0, checkpointZSpawn[i]);
 		}
-
+		
 		//then attaches a dummy to the left leg, then right leg of each checkpoint. 
 		legdummy[0] = dummyMesh->CreateModel(legPos, 0, 0);
 		legdummy[0]->AttachToParent(checkpoint[0]);
@@ -523,12 +582,21 @@ void main()
 	IMesh* floorTankMesh = myEngine->LoadMesh("TankSmall1.x");
 	IModel* floorTank = tankMesh->CreateModel(80, -5, 80);
 	floorTank->RotateZ(20.0f);
+
+	//Waypoint spawning!
+	IModel* waypoint[8];
+	for (int i = 0; i < 8; i++)
+	{
+		waypoint[i] = dummyMesh->CreateModel(waypointX[i], 0, waypointZ[i]);
+	}
+	
+
 	//------------------------------------------------------------------------
 	//////////////////////////////////////////////////////////////////////////////
 	camera->AttachToParent(car);
 	timer = myEngine->Timer();
 
-	currentState gameState = Waiting; //initial state
+	
 									  // The main game loop, repeat until engine is stopped
 	while (myEngine->IsRunning())
 	{
@@ -580,12 +648,12 @@ void main()
 		//only the appropriate checkpoints trigger the appropriate state, and only in order
 		if (gameState == Go)
 		{
+			NPCMovement(npcCar, waypoint);
 			carMovement(car, myFont);
 			speedOutput(myFont);
 			carFloaty(car);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
-			legCollision(car, legdummy);
-			wallCollision(wall, car, tank, floorTank);
+			Collision(car, legdummy,wall, tank, floorTank, npcCar);
 
 			getCheckpoint(checkpoint[0]); //checks for a specific checkpoint, then checks to see if a collision with the middle of it happens
 			if (car->GetX() > checkpointMinX + carRadius && car->GetX() < checkpointMaxX + carRadius
@@ -596,13 +664,13 @@ void main()
 		}
 		if (gameState == FirstCheckpoint)
 		{
+			NPCMovement(npcCar, waypoint);
 			speedOutput(myFont);
 			myFont->Draw("Stage 1 Complete", 500, 625, kBlack);
 			carFloaty(car);
 			carMovement(car, myFont);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
-			legCollision(car, legdummy);
-			wallCollision(wall, car, tank, floorTank);
+			Collision(car, legdummy, wall, tank, floorTank, npcCar);
 
 			getCheckpoint(checkpoint[1]);//checks for a specific checkpoint, then checks to see if a collision with the middle of it happens
 			if (car->GetX() > checkpointMinX + carRadius && car->GetX() < checkpointMaxX + carRadius
@@ -613,13 +681,14 @@ void main()
 		}
 		if (gameState == SecondCheckpoint)
 		{
+			NPCMovement(npcCar, waypoint);
 			speedOutput(myFont);
 			myFont->Draw("Stage 2 Complete", 500, 625, kBlack);
 			carFloaty(car);
 			carMovement(car, myFont);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
-			legCollision(car, legdummy);
-			wallCollision(wall, car, tank, floorTank);
+			Collision(car, legdummy, wall, tank, floorTank, npcCar);
+
 			getCheckpoint(checkpoint[2]);//checks for a specific checkpoint, then checks to see if a collision with the middle of it happens
 			if (car->GetX() > checkpointMinX + carRadius && car->GetX() < checkpointMaxX + carRadius
 				&& car->GetZ() > checkpointMinZ + carRadius && car->GetZ() < checkpointMaxZ + carRadius)
@@ -629,14 +698,15 @@ void main()
 		}
 		if (gameState == ThirdCheckpoint)
 		{
+			NPCMovement(npcCar, waypoint);
 			carMovement(car, myFont);
 			speedOutput(myFont);
 			myFont->Draw("Stage 3 Complete", 500, 625, kBlack);
 			myFont->Draw(" ", 850, 625, kRed);
 			carFloaty(car);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
-			legCollision(car, legdummy);
-			wallCollision(wall, car, tank, floorTank);
+			Collision(car, legdummy, wall, tank, floorTank, npcCar);
+
 			getCheckpoint(checkpoint[3]);//checks for a specific checkpoint, then checks to see if a collision with the middle of it happens
 			if (car->GetX() > checkpointMinX + carRadius && car->GetX() < checkpointMaxX + carRadius
 				&& car->GetZ() > checkpointMinZ + carRadius && car->GetZ() < checkpointMaxZ + carRadius)
@@ -648,18 +718,60 @@ void main()
 		//Winner Winner Chicken Dinner
 		if (gameState == Finish)
 		{
+			NPCMovement(npcCar, waypoint);
 			myFont->Draw("Race Complete!", 500, 625, kGreen);
+			myFont->Draw("Press 'R' to Restart!", 500, 650, kRed);
 			carMovement(car, myFont);
-			carFloaty(car);
-			legCollision(car, legdummy);
-			wallCollision(wall, car, tank, floorTank);
+			carFloaty(car); 
+			Collision(car, legdummy, wall, tank, floorTank, npcCar);
 			cameraControl(mouseMoveX, mouseMoveY, myEngine, camera, car);
+
+			if (myEngine->KeyHit(gameReset))
+			{
+				//npc reset
+				currentWaypoint = 0;
+				npcCar->SetPosition(0, 0, 0);
+				npcCar->ResetOrientation();
+
+				//player car reset
+				car->SetPosition(0, 0, -50);
+				car->ResetOrientation();
+
+				//game logic reset
+				carHealth = 100;
+				momentum = { 0.0f, 0.0f };
+				thrust = { 0.0f, 0.0f };
+				counter = 4.0;
+				gameState = Waiting;
+			}
+		}
+		if (gameState == Dead)
+		{
+			myFont->Draw("Your Car Broke!!", 500, 625, kGreen);
+			myFont->Draw("Press 'R' to Restart!", 500, 650, kRed);
+			if (myEngine->KeyHit(gameReset))
+			{
+				//npc reset
+				currentWaypoint = 0;
+				npcCar->SetPosition(0, 0, 0);
+				npcCar->ResetOrientation();
+
+				//player car reset
+				car->SetPosition(0, 0, -50);
+				car->ResetOrientation();
+
+				//game logic reset
+				carHealth = 100;
+				momentum = { 0.0f, 0.0f };
+				thrust = { 0.0f, 0.0f };
+				counter = 4.0;
+				gameState = Waiting;
+			}
 		}
 		if (myEngine->KeyHit(quit))
 		{
 			myEngine->Stop();
 		}
-
 	}
 
 	// Delete the 3D engine now we are finished with it

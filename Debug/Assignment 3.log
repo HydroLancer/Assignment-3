@@ -1,5 +1,5 @@
 ﻿  Assignment 3.cpp
-c:\users\nhendley\downloads\assignment-3-master\assignment-3-master\assignment 3.cpp(258): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-c:\users\nhendley\downloads\assignment-3-master\assignment-3-master\assignment 3.cpp(259): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-  Assignment 3.vcxproj -> C:\Users\Nhendley\Downloads\Assignment-3-master\Assignment-3-master\\Assignment 3Debug.exe
-  Assignment 3.vcxproj -> C:\Users\Nhendley\Downloads\Assignment-3-master\Assignment-3-master\\Assignment 3.pdb (Full PDB)
+e:\uni stuff!\co1301 - games concepts\assignments\assignment 3\assignment 3.cpp(286): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+e:\uni stuff!\co1301 - games concepts\assignments\assignment 3\assignment 3.cpp(287): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+  Assignment 3.vcxproj -> E:\Uni Stuff!\CO1301 - Games Concepts\Assignments\Assignment 3\\Assignment 3Debug.exe
+  Copying DLLs & shaders...
